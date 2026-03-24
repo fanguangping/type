@@ -1,0 +1,17 @@
+(rules
+ (processor
+  (post
+   (upgrade (lambda (x) x) :<=)))
+ (macro
+  (li           (rd imm)
+                (: high (arithmetic-shift (+ (car imm) #x800) -12))
+                (: low  (- (car imm) (arithmetic-shift high 12)))
+                (:<= ((lui rd (car imm)) (addi rd rd low))))
+  (let          (x imm)       (li x (car imm)))
+  (:-quit    ()    (:<= ((li t0 #x100000)
+                         (li t1 #x5555)
+                         (sw t1 t0 0)
+                         (label spin)
+                         (jump spin))))
+  (:-putchar ()    (:<= ((li t0 #x10000000)
+                         (sb a0 t0 0))))))

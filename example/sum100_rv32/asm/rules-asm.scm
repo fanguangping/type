@@ -3,8 +3,8 @@
   (post
    (upgrade (lambda (x) x) :<=)))
  (function
-  (~s          (x) (symbol->string (if (list? x) (car x) x)))
-  (~r          (x) (~a (if (list? x) (car x) x)))
+  (~s          (x) (symbol->string x))
+  (~r          (x) (~a x))
   (apd         (lst) (string-append* lst))
   (mklabel     (x) (string-replace x "-" "_")))
  (macro
@@ -18,7 +18,7 @@
   (note        (x)           "")
   (addi        (x y imm)     (apd ("addi " (~s x) "," (~s y) "," (~r imm))))
   (let         (x imm)       (apd ("li " (~s x) "," (~r imm))))
-  (-=          (x imm)       (apd ("addi " (~s x) "," (~s x) "," (~r (- 0 (car imm))))))
+  (-=          (x imm)       (apd ("addi " (~s x) "," (~s x) "," (~r (- 0 imm)))))
   (+=          (x imm)       (apd ("addi " (~s x) "," (~s x) "," (~r imm))))
   (/=          (x y)         (apd ("div " (~s x) "," (~s x) "," (~r y))))
   (=+          (x y z)       (apd ("add " (~s x) "," (~s y) "," (~r z))))

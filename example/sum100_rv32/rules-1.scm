@@ -116,12 +116,12 @@
         (:label loop-for-?-end id))
   (*** 处理入栈 ***)
   (push-stack (reg-list)
-              (: sz (:rsize reg-bytes (car reg-list)))
+              (: sz (:rsize reg-bytes reg-list))
               (note "begin push stack")
               (-= sp sz)
               (: sz 0)
               (:<=
-               (:foreach r (idx inc sz reg-bytes) in (car reg-list)
+               (:foreach r (idx inc sz reg-bytes) in reg-list
                          (store-word r sp idx)))
               (note "end push stack"))
   (*** 处理出栈 ***)
@@ -130,9 +130,9 @@
              (note "begin pop stack")
              (:<=
               (<->
-               (:foreach r (idx inc sz reg-bytes) in (car reg-list)
+               (:foreach r (idx inc sz reg-bytes) in reg-list
                          (load-word r sp idx))))
-             (: sz (:rsize reg-bytes (car reg-list)))
+             (: sz (:rsize reg-bytes reg-list))
              (+= sp sz)
              (note "end pop stack"))
   (*** 处理无用指令 ***)
@@ -140,13 +140,13 @@
   (return (x) ())
   (*** 处理栈数据分配与回收 ***)
   (:-stack (var byte-cnt)
-           (: sz   (* (car byte-cnt) 4))
+           (: sz   (* byte-cnt 4))
            (: off  (- sz reg-bytes))
            (-= sp sz)
            (store-word var sp off)
            (addi var sp sz))
   (:-reclaim (var byte-cnt)
-             (: sz   (* (car byte-cnt) 4))
+             (: sz   (* byte-cnt 4))
              (: off  (- sz reg-bytes))
              (load-word var sp off)
              (+= sp sz))

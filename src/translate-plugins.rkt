@@ -171,7 +171,7 @@
                   ;; 最后一个符号,打包剩余参数
                   (let ((val (cond
                                [(null? args) '()]
-                               ; [(null? (cdr args)) (car args)]
+                               [(null? (cdr args)) (car args)]
                                [else args])))
                     (reverse (cons (list first val) bindings)))
                   ;; 不是最后一个,必须有一个参数

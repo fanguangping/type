@@ -175,8 +175,8 @@
                (define new-code (first result))
                (define new-local (second result))
                (define global (third result))
-               (check-equal? new-code '(:<= ((apply-op (args (a b c)) (func-body))))
-               (check-equal? new-local '((args (args (a b c))) (body (func-body))))))
+               (check-equal? new-code '(:<= ((apply-op (args (a b c)) (func-body)))))
+               (check-equal? new-local '((args (args (a b c))) (body (func-body)))))
 
     (test-case "多个可选关键字 - 只提供body"
                (define (rule-selector sym)

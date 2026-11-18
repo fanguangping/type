@@ -98,6 +98,25 @@ TYPE 是一个基于规则的、语义驱动的计算机程序翻译系统。它
 	  ('displayln ('+ x y))))
    ```
 
+### 版本与帮助
+
+TYPE 提供统一的命令行入口 `type.rkt`，可查看版本、帮助，或进入带欢迎信息的 REPL：
+
+```bash
+# 查看版本号,输出形如 TYPE v0.1.0
+racket type.rkt --version
+racket type.rkt -v
+
+# 查看帮助
+racket type.rkt --help
+racket type.rkt -h
+
+# 进入 REPL(启动时显示项目名称、版本号和简要使用提示)
+racket type.rkt
+```
+
+版本号统一存放在仓库根目录的 `info.rkt` 中；`raco pkg` 元数据直接读取它，翻译核心中的 `*type-version*` 通过基础 `read` 解析同一处定义，发布时只需修改一处。
+
 ---
 
 ## 🧠 工作原理
@@ -164,21 +183,27 @@ type/
 ├── README.md                 # 项目说明文档
 ├── LICENSE                   # 开源协议
 ├── CONTRIBUTING.md           # 贡献指南
+├── ROADMAP.md                # 路线图
+├── info.rkt                  # 版本号唯一来源 + raco pkg 元数据
+├── type.rkt                  # 统一命令行 / REPL 入口
 ├── example/                  # 示例程序
-│   ├── example-0.scm
-│   ├── example-1.scm
-│   └── example-2.scm
+│   ├── simple/
+│   └── sum100_rv32/
 ├── src/                      # 翻译系统
 │   ├── trie.rkt
 │   ├── translate-utils.rkt
-│   └── ...
+│   ├── translate-plugins.rkt
+│   ├── source-processors.rkt
+│   └── translate-system.rkt
 ├── test/                     # 测试套件
 │   ├── trie-test.rkt
 │   ├── translate-utils-test.rkt
-│   └── ...
+│   ├── translate-plugins-test.rkt
+│   ├── source-processors-test.rkt
+│   ├── translate-system-test.rkt
+│   └── version-test.rkt
 └── doc/                      # 详细文档
-    ├── semantics.md          # 语义详解
-    └── api-reference.md      # API 参考
+    └── reference/api.md      # 算符/关键字参考
 ```
 
 ---

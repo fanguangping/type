@@ -7,12 +7,44 @@
          preprocess-source
          postprocess-source
          initialize-global-bindings
-         rule-selector-from-trie)
+         rule-selector-from-trie
+         *type-version*)
 
+(require racket/runtime-path)
 (require "source-processors.rkt")
 (require "translate-utils.rkt")
 (require "translate-plugins.rkt")
 (require "trie.rkt")
+
+;; ============================================================================
+;; 版本信息
+;; ============================================================================
+
+;; 版本号唯一来源为仓库根目录的 info.rkt。
+;; 使用基础 read 解析 (define version "..."),兼容 Racket 7.5 的 info.rkt 限制。
+(define-runtime-path info-file "../info.rkt")
+
+(define (read-version-from-info path)
+  (if (file-exists? path)
+      (call-with-input-file path
+        (lambda (in)
+          ;; 跳过 "#lang info" 行
+          (read-line in)
+          (let loop ()
+            (let ([form (read in)])
+              (cond
+                [(eof-object? form) "0.0.0"]
+                [(and (pair? form)
+                      (eq? (car form) 'define)
+                      (pair? (cdr form))
+                      (eq? (cadr form) 'version)
+                      (pair? (cddr form))
+                      (string? (caddr form)))
+                 (caddr form)]
+                [else (loop)])))))
+      "0.0.0"))
+
+(define *type-version* (read-version-from-info info-file))
 
 ;; ============================================================================
 ;; 辅助函数:规则构建与选择

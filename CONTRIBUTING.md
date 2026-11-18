@@ -201,7 +201,7 @@ Closes #42
 
 ## 开发环境设置
 
-1. **安装 Racket**（版本 9.14 或更高）：
+1. **安装 Racket**（版本 7.5 或更高）：
    - 官网下载：https://racket-lang.org/download/
    - 或使用包管理器：
      - macOS: `brew install racket`

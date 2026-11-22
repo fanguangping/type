@@ -46,6 +46,9 @@
      (check-true (string-contains? usage "-v"))
      (check-true (string-contains? usage "--help"))
      (check-true (string-contains? usage "-h"))
+     (check-true (string-contains? usage "--build"))
+     (check-true (string-contains? usage "-b"))
+     (check-true (string-contains? usage "--verbose"))
      (check-true (string-contains? usage *type-version*)))
 
    (test-case "print-welcome 包含项目名、版本号和使用提示"
@@ -63,6 +66,16 @@
 
    (test-case "parse-args 对未知选项返回 error"
      (check-equal? (parse-args '("--bogus"))
-                   (list 'error "--bogus")))))
+                   (list 'error "--bogus")))
+
+    (test-case "parse-args 识别构建参数"
+      (check-equal? (parse-args '("--build" "build.scm"))
+                    (list 'build "build.scm"))
+      (check-equal? (parse-args '("-b" "build.scm"))
+                    (list 'build "build.scm"))
+      (check-equal? (parse-args '("--build"))
+                    (list 'error "--build"))
+      (check-equal? (parse-args '("--verbose"))
+                    'repl))))
 
 (run-tests version-tests)

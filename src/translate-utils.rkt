@@ -2,6 +2,11 @@
 
 (provide (all-defined-out))
 
+;; 寄存器分配器(issue #7):重新导出到规则求值命名空间,
+;; 使规则文件中的 function 可以直接调用 allocate-registers 等纯辅助函数。
+(require "register-allocator.rkt")
+(provide (all-from-out "register-allocator.rkt"))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Description: 调试打印函数,可接受任意数量参数,并将它们以 pretty 形式打印
 ; Input:

@@ -211,6 +211,51 @@ example.scm + build.scm
 └─────────────────────────────────────────────────────┘
 ```
 
+### 寄存器分配
+
+寄存器是有限资源，函数调用又会改写一部分寄存器。若把跨调用仍然有用的值留在易失寄存器里，
+调用返回后这个值就被覆盖了。`example/rv32_elf` 早期用「把 `end` 硬搬到 `a2`」绕过该问题，
+这是不可扩展的补丁；现在由 `src/register-allocator.rkt` 统一解决。
+
+**为什么要入栈/出栈**
+
+- 调用指令会改写返回地址寄存器 `ra`，函数若不保存它就无法返回；
+- 被调用者保存寄存器 `s*` 的约定是「被调用者负责恢复」，因此函数使用了哪些 `s*`，
+  就必须在序言 `push-stack` 保存、在尾声 `pop-stack` 恢复；
+- 序言还负责把入口实参寄存器 `a*` 中的跨调用活跃值搬到分配到的 `s*`；
+- 调用方则把实参搬到 `a*`、把调用后仍需要的 `t*` 暂存到栈上，再执行 `call`。
+  这就是「为何出入栈」：保存调用链上会被改写、但后续仍要用的值。
+
+**算法是纯机制，约定来自规则文件**
+
+`src/register-allocator.rkt` 不预设任何目标平台或规则文件的约定。以下内容全部由规则文件的
+`mapping` 定义，并通过参数显式传给分配器（以 `example/rv32_elf/rules-0.scm` 为例）：
+
+- `reg-pools`：各角色寄存器表及分配优先级（`arg` / `temp` / `saved`）；
+- `reg-prefixes`：物理寄存器符号的首字母（`"sfta"`）；
+- `call-tags`：哪些标签代表调用（`:f` / `:s` / `call`）；
+- `control-tags`：哪些标签是控制结构（`!for` / `!while` / `!do-while` / `!if` / `!if-else`）；
+- `return-tag`：`return` 语句的标签。
+
+因此换一套 ABI 或标签约定只需改规则文件，分配器源码无需改动。
+
+**分配算法（调用感知的线性扫描）**
+
+1. `live-intervals` 为每个形参计算活跃区间 `[入口, 最后使用]`，并标记是否跨过调用。
+   控制结构头部的变量会在节点末尾补记一次使用，避免漏掉「循环每轮都要重新判断」的循环变量。
+2. `allocate-registers` 按区间起点扫描：
+   - 不跨调用的变量保留入口实参寄存器（易失，但调用前已用完）；
+   - 跨调用的变量只能分配到规则文件提供的被调用者保存寄存器池；
+   - 保存寄存器不足时返回溢出槽位（spill），当前规则层直接报错，避免生成错误代码。
+3. `rules-0.scm` 用分配结果替换函数体中的形参，插入入口搬移，并把实际使用的保存寄存器加入序言保存列表。
+   返回值寄存器不加入序言保存列表，以免把刚写好的返回值覆盖掉。
+   `signature` 从替换后的函数体提取，记录真实的 ABI 实参/返回寄存器。
+
+分配器辅助过程通过 `src/translate-utils.rkt` 重新导出，规则文件可直接调用
+`register-pool` / `live-intervals` / `allocate-registers` 等过程。
+相关测试见 `test/register-allocator-test.rkt`，其中包含「不再出现 `end -> a2` 硬编码」的回归验证，
+以及使用自定义池/前缀/标签（非 RV32）验证分配器无硬编码的用例。
+
 ---
 
 ## 📚 项目结构
@@ -236,7 +281,8 @@ type/
 │   ├── build-system.rkt      # 构建器:读取工序清单并依次执行
 │   ├── rule-loader.rkt       # 规则/源码 S 表达式加载
 │   ├── trie.rkt
-│   ├── translate-utils.rkt
+│   ├── register-allocator.rkt # 调用感知的线性扫描寄存器分配器
+│   ├── translate-utils.rkt    # 同时重新导出分配器辅助过程
 │   ├── translate-plugins.rkt
 │   ├── source-processors.rkt
 │   ├── translate-system.rkt  # 默认翻译工序的核心实现
@@ -258,7 +304,8 @@ type/
 │   ├── version-test.rkt
 │   ├── elf-file-wrapper-test.rkt
 │   ├── build-system-test.rkt
-│   └── process-test.rkt
+│   ├── process-test.rkt
+│   └── register-allocator-test.rkt # 分配器单测 + end -> a2 硬编码回归
 └── doc/                      # 详细文档
     └── reference/api.md      # 算符/关键字参考
 ```

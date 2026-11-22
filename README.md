@@ -13,10 +13,11 @@ TYPE 是一个基于规则的、语义驱动的计算机程序翻译系统。它
 ## ✨ 核心特性
 
 - **语义驱动翻译**：基于九种核心翻译语义（顺序、字典、求值、指代、转换、升级、消除、位置、索引），实现灵活强大的程序转换
+- **工序清单构建**：`type.rkt` 作为统一入口，把源码与「规则 + 工序」清单交给构建器，串联翻译、链接、编码与包装
 - **多阶段流水线**：支持通过规则文件串联多个翻译阶段，每个阶段独立配置
 - **可逆/不可逆翻译**：支持对等（可逆）与不对等（不可逆）的翻译策略
 - **S 表达式原生支持**：翻译源与目标均为 S 表达式，完美适配 Lisp 系语言生态
-- **可执行文件生成**：提供包装器、链接器、加载器，可将规整的四元组列表等目标程序编译为二进制文件
+- **ELF 文件包装**：依据 `ruleset/elf/elf-file.scm` 布局规则，生成 ELF32/ELF64 可执行文件（ET_EXEC）与可重定位目标文件（ET_REL），支持符号解析与 `.rela.text` 重定位项，入口点默认为 `_start`
 - **高度可扩展**：翻译系统核心稳定，翻译规则完全可定制
 
 ---
@@ -80,13 +81,13 @@ TYPE 是一个基于规则的、语义驱动的计算机程序翻译系统。它
 3. **执行翻译**
    ```scheme
    ;; 在 Racket REPL 中
-   (require "translate-system.rkt")
+   (require "type.rkt")
    
-   ;; 多阶段翻译
-   (translate-program "./"
-					  "./build/"
-					  "simple-program.scm"
-					  '("rules-0.scm"))
+   ;; 直接翻译一个 S 表达式程序
+   (translate source '() rules)
+
+   ;; 或按工序清单构建最终成品
+   (build-file "example/rv32_elf/build.scm")
    ```
 
 4. **翻译结果**
@@ -113,6 +114,10 @@ racket type.rkt -h
 
 # 进入 REPL(启动时显示项目名称、版本号和简要使用提示)
 racket type.rkt
+
+# 根据工序清单构建最终成品
+racket type.rkt --build example/rv32_elf/build.scm
+racket type.rkt -b example/rv32_elf/build.scm --verbose
 ```
 
 版本号统一存放在仓库根目录的 `info.rkt` 中；`raco pkg` 元数据直接读取它，翻译核心中的 `*type-version*` 通过基础 `read` 解析同一处定义，发布时只需修改一处。
@@ -137,15 +142,47 @@ TYPE 将**所有结构化程序抽象为 S 表达式**，视为“单词（原�
 | **位置语义** | 调整句子或单词的顺序 | -                                                 |
 | **索引语义** | 通过绝对/相对数值找到符号要链接的语句地址 | -                                                 |
 
-### 翻译流水线
+### 构建流水线
+
+TYPE 把「从源码到成品」看作一条构建链：
+
+- **翻译器**是一种工序：把 S 表达式按规则变换为另一种 S 表达式；
+- **链接器**是一种工序：解析符号与重定位，连接多个翻译成果；
+- **包装器**是一种工序：把代码、符号和重定位信息序列化为最终文件格式；
+- **构建器**不是工序，而是工序的编排者：读取工序清单、传递中间产物、输出成品。
 
 ```
-example.scm + rules-0.scm --[stage1]--> tmpSource1.scm
-tmpSource1.scm + rules-1.scm --[stage2]--> tmpSource2.scm
-tmpSource2.scm + rules-2.scm --[stage3]--> dest.scm
+example.scm + build.scm
+        │
+        ├─ translate(rules-0.scm) ──► translate(rules-1.scm) ──► ...
+        ├─ link(rules-link.scm)      ──► symbols / relocs
+        ├─ encode                    ──► bytes
+        └─ wrap-elf                  ──► sum100.o / sum100.elf
 ```
 
-每个阶段独立配置规则文件，实现关注点分离和规则复用。
+每个阶段独立配置规则与选项，`build.scm` 中的相对路径以清单文件所在目录为基准。
+
+### 工序清单示例
+
+`example/rv32_elf/build.scm` 是一份纯数据的工序清单：
+
+```scheme
+(build
+ (source "example.scm")
+ (dump-dir "build")
+ (stages
+  (translate (rules "rules-0.scm"))
+  (translate (rules "rules-1.scm"))
+  (translate (rules "rules-2.scm"))
+  (link      (rules "rules-link.scm") (emit symbols relocs))
+  (translate (rules "rules-bin.scm"))
+  (encode    (from source) (to code))
+  (wrap-elf  (kind object)     (output "sum100.o")   (class 32))
+  (wrap-elf  (kind executable) (output "sum100.elf") (class 32)
+             (entry _start) (load-addr #x80000000))))
+```
+
+`link` 工序把符号表与重定位项写入构建环境，后续 `wrap-elf` 只负责序列化，包装器不需要反向解析源码。
 
 ### 翻译引擎架构
 
@@ -185,23 +222,43 @@ type/
 ├── CONTRIBUTING.md           # 贡献指南
 ├── ROADMAP.md                # 路线图
 ├── info.rkt                  # 版本号唯一来源 + raco pkg 元数据
-├── type.rkt                  # 统一命令行 / REPL 入口
+├── type.rkt                  # 统一命令行 / REPL / 构建入口
 ├── example/                  # 示例程序
 │   ├── simple/
-│   └── sum100_rv32/
-├── src/                      # 翻译系统
+│   ├── sum100_rv32/
+│   └── rv32_elf/             # 声明式工序清单 + 生成的 .elf/.o
+│       ├── build.scm         # 「规则 + 工序」清单
+│       └── rv32-elf-builder.rkt
+├── ruleset/                  # 规则库
+│   └── elf/
+│       └── elf-file.scm      # ELF32/64 文件布局规则
+├── src/                      # 翻译系统与构建工序
+│   ├── build-system.rkt      # 构建器:读取工序清单并依次执行
+│   ├── rule-loader.rkt       # 规则/源码 S 表达式加载
 │   ├── trie.rkt
 │   ├── translate-utils.rkt
 │   ├── translate-plugins.rkt
 │   ├── source-processors.rkt
-│   └── translate-system.rkt
+│   ├── translate-system.rkt  # 默认翻译工序的核心实现
+│   ├── process/              # 各阶段工序适配器
+│   │   ├── process-utils.rkt
+│   │   ├── symbol-tools.rkt
+│   │   ├── translate-process.rkt
+│   │   ├── link-process.rkt
+│   │   ├── encode-process.rkt
+│   │   └── elf-process.rkt
+│   └── wrapper/              # 文件包装器
+│       └── elf-file-wrapper.rkt
 ├── test/                     # 测试套件
 │   ├── trie-test.rkt
 │   ├── translate-utils-test.rkt
 │   ├── translate-plugins-test.rkt
 │   ├── source-processors-test.rkt
 │   ├── translate-system-test.rkt
-│   └── version-test.rkt
+│   ├── version-test.rkt
+│   ├── elf-file-wrapper-test.rkt
+│   ├── build-system-test.rkt
+│   └── process-test.rkt
 └── doc/                      # 详细文档
     └── reference/api.md      # 算符/关键字参考
 ```
